@@ -44,11 +44,16 @@ public class AutoRestartConfirmationDialog implements WindowHandler  {
 
     @Override
     public boolean recogniseWindow(Window window) {
-        if (!(window instanceof JDialog)) return false;
-
-        if (SwingUtils.findTextPane(window, "trading platform restart automatically") != null) return true;
-        JOptionPane op = SwingUtils.findOptionPane(window);
-        return (op != null && op.getMessage() != null && op.getMessage().toString().contains("trading platform restart automatically"));
+        // Legacy TWS form: JDialog with "trading platform restart automatically" body text.
+        if (window instanceof JDialog) {
+            if (SwingUtils.findTextPane(window, "trading platform restart automatically") != null) return true;
+            JOptionPane op = SwingUtils.findOptionPane(window);
+            if (op != null && op.getMessage() != null && op.getMessage().toString().contains("trading platform restart automatically")) return true;
+        }
+        // Current Gateway form: a JFrame titled "Exit Session Setting" with an "application will automatically restart" label.
+        if (SwingUtils.titleContains(window, "Exit Session Setting")
+                && SwingUtils.findLabel(window, "automatically restart") != null) return true;
+        return false;
     }
 
 }
