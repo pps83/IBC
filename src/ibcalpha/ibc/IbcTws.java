@@ -33,6 +33,7 @@ import java.util.Date;
 import java.util.Enumeration;
 import java.util.List;
 import java.util.Properties;
+import java.util.TimeZone;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -274,6 +275,10 @@ public class IbcTws {
             TradingModeManager.tradingModeManager().logDiagnosticMessage();
             ConfigDialogManager.configDialogManager().logDiagnosticMessage();
 
+            // Adopt jts.ini [Logon]/TimeZone as the JVM default before anything TZ-dependent runs
+            // (notably getColdRestartTime()), so IBC's schedule parsing matches Gateway's TZ.
+            setTimeZoneFromJtsIni();
+
             startCommandServer();
 
             startShutdownTimerIfRequired();
@@ -345,6 +350,38 @@ public class IbcTws {
         return windowHandlers;
     }
     
+    private static void setTimeZoneFromJtsIni() {
+        try {
+            java.nio.file.Path path = Paths.get(getJtsIniFilePath());
+            if (!Files.isRegularFile(path)) {
+                return;
+            }
+            List<String> lines = Files.readAllLines(path);
+            boolean inLogon = false;
+            for (String raw : lines) {
+                String line = raw.trim();
+                if (line.equals("[Logon]")) {
+                    inLogon = true;
+                    continue;
+                }
+                if (line.startsWith("[")) {
+                    inLogon = false;
+                    continue;
+                }
+                if (inLogon && line.startsWith("TimeZone=")) {
+                    String tz = line.substring("TimeZone=".length()).trim();
+                    if (!tz.isEmpty()) {
+                        TimeZone.setDefault(TimeZone.getTimeZone(tz));
+                        Utils.logToConsole("JVM default TZ set to " + tz + " from jts.ini [Logon]/TimeZone");
+                    }
+                    return;
+                }
+            }
+        } catch (IOException e) {
+            Utils.logToConsole("Could not read jts.ini TimeZone: " + e.getMessage());
+        }
+    }
+
     private static Date getColdRestartTime() {
         String coldRestartTimeSetting = Settings.settings().getString("ColdRestartTime", "");
         if (coldRestartTimeSetting.length() == 0) {
