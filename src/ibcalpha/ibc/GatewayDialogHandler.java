@@ -21,9 +21,13 @@ package ibcalpha.ibc;
 import java.awt.Window;
 import java.awt.event.WindowEvent;
 import javax.swing.JDialog;
+import javax.swing.JTextArea;
+import javax.swing.JTextPane;
 
 public class GatewayDialogHandler implements WindowHandler {
-    
+
+    private static final String CONN_FAIL = "Connection to server failed";
+
     @Override
     public boolean filterEvent(Window window, int eventId) {
         switch (eventId) {
@@ -36,13 +40,24 @@ public class GatewayDialogHandler implements WindowHandler {
 
     @Override
     public void handleWindow(Window window, int eventID) {
-        String text = SwingUtils.getLabelTexts(window);
-        // since this is a generic dialog, we always log the text
-        Utils.logToConsole(text);
-        if (text.startsWith("Connection to server failed")) {
+        String labelText = SwingUtils.getLabelTexts(window);
+        // since this is a generic dialog, we always log the label text
+        Utils.logToConsole(labelText);
+        // The CONN_FAIL text appears in a JTextPane / JTextArea in recent Gateway builds, not a
+        // JLabel, so getLabelTexts misses it.
+        JTextPane pane = SwingUtils.findTextPane(window, CONN_FAIL);
+        JTextArea area = SwingUtils.findTextArea(window, CONN_FAIL);
+        if (labelText.startsWith(CONN_FAIL) || pane != null || area != null) {
+            String body = labelText;
+            if (pane != null) {
+                body = pane.getText();
+            } else if (area != null) {
+                body = area.getText();
+            }
+            Utils.logToConsole(body);
             Utils.logToConsole("Cold restart in progress");
             // stop tidily and do a cold restart
-            MyCachedThreadPool.getInstance().execute(new StopTask(null, true, "Cold restart after Connection to server failed"));
+            MyCachedThreadPool.getInstance().execute(new StopTask(null, true, "Cold restart after " + CONN_FAIL));
 
             if (! SwingUtils.clickButton(window, "OK")) {
                 Utils.logError("could not dismiss Login Error dialog because we could not find the OK button");
