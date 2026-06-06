@@ -20,6 +20,7 @@ package ibcalpha.ibc;
 
 import java.awt.Window;
 import java.awt.event.WindowEvent;
+import javax.swing.JButton;
 import javax.swing.JDialog;
 
 public class ExitConfirmationDialogHandler implements WindowHandler {
@@ -36,10 +37,14 @@ public class ExitConfirmationDialogHandler implements WindowHandler {
         // we don't handle this dialog if it's not the result of 
         // a StopTask running
         if (!StopTask.shutdownInProgress()) return;
-        
-        if (!SwingUtils.clickButton(window, "Yes")) {
+
+        JButton yes = SwingUtils.findButton(window, "Yes");
+        if (yes == null) {
             Utils.logError("could not ignore shutdown confirmation dialog because we could not find one of the controls.");
+            return;
         }
+        StopTask.commitPendingClosing();
+        SwingUtils.clickButton(yes);
     }
 
     public boolean recogniseWindow(Window window) {

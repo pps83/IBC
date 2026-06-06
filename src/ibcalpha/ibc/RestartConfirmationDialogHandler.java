@@ -20,6 +20,7 @@ package ibcalpha.ibc;
 
 import java.awt.Window;
 import java.awt.event.WindowEvent;
+import javax.swing.JButton;
 import javax.swing.JDialog;
 
 public class RestartConfirmationDialogHandler implements WindowHandler {
@@ -33,9 +34,15 @@ public class RestartConfirmationDialogHandler implements WindowHandler {
     }
 
     public void handleWindow(Window window, int eventID) {
-        if (!SwingUtils.clickButton(window, "Yes")) {
+        JButton yes = SwingUtils.findButton(window, "Yes");
+        if (yes == null) {
             Utils.logError("could not ignore shutdown confirmation dialog because we could not find one of the controls.");
+            return;
         }
+        if (!RestartTask.commitPendingTerminalClose()) {
+            EventBroadcaster.instance().beginClosing("RESTART");
+        }
+        SwingUtils.clickButton(yes);
     }
 
     public boolean recogniseWindow(Window window) {

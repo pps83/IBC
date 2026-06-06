@@ -53,6 +53,11 @@ public abstract class AbstractLoginHandler implements WindowHandler {
     public final void handleWindow(Window window, int eventID) {
         if (LoginManager.loginManager().getLoginHandler() == null) LoginManager.loginManager().setLoginHandler(this);
         LoginManager.loginManager().setLoginFrame((JFrame) window);
+        // Real LOGGED_OUT observation point: the login frame opened. The broadcaster
+        // gates this on having previously seen READY so initial-boot dialogs do not
+        // poison the snapshot; the only emissions that actually fire here are real
+        // mid-session re-auth events.
+        EventBroadcaster.instance().emitLoggedOut();
         switch (LoginManager.loginManager().getLoginState()){
             case LOGGED_OUT:
                 if (! SessionManager.isRestart()) {
