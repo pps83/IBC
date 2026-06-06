@@ -57,6 +57,12 @@ class Utils {
      * the method has been called on the Swing event dispatch thread
      */
     static boolean invokeMenuItem(final Container container, final String[] path) throws IllegalStateException {
+        return invokeMenuItem(container, path, null);
+    }
+
+    // onWillClick (if non-null) runs on the EDT immediately before doClick(), giving callers a hook
+    // to win first-wins races against listeners that the menu action itself triggers synchronously.
+    static boolean invokeMenuItem(final Container container, final String[] path, final Runnable onWillClick) throws IllegalStateException {
         if (SwingUtilities.isEventDispatchThread()) throw new IllegalStateException("Function must not be called on the event dispatch thread, as it may block the thread");
         while (true) {
             FutureTask<Boolean> task = new FutureTask<>(() -> {
@@ -66,6 +72,7 @@ class Utils {
                 JMenuItem menuItem = SwingUtils.findMenuItemInAnyMenuBar(container, path);
                 if (menuItem == null) throw new IbcException("menu item: " + s);
                 if (!menuItem.isEnabled()) return false;
+                if (onWillClick != null) onWillClick.run();
                 menuItem.doClick();
                 return true;
             });

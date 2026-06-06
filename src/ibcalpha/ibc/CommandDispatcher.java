@@ -51,6 +51,16 @@ class CommandDispatcher
             	handleReconnectAccountCommand();
             } else if (cmd.equalsIgnoreCase("RESTART")) {
             	handleRestartCommand();
+            } else if (cmd.equalsIgnoreCase("SUBSCRIBE")) {
+                handleSubscribeCommand();
+                // After a successful SUBSCRIBE the channel becomes an event-only stream
+                // owned by EventBroadcaster. Returning here stops the dispatcher loop
+                // from writing prompts or processing further commands that would
+                // interleave with EVENT/STATE lines, and leaves the socket open for
+                // broadcasts and terminal CLOSING.
+                if (mChannel.isSubscribed()) {
+                    return;
+                }
             } else if (cmd.equalsIgnoreCase("PAUSE")) {
             	handlePauseCommand();
             } else {
@@ -112,7 +122,7 @@ class CommandDispatcher
     }
 
     private void handleStopCommand() {
-        (new StopTask(mChannel, false, "STOP command")).run();     // run on the current thread
+        (new StopTask(mChannel, false, "STOP command", "STOP")).run();     // run on the current thread
     }
     
     private void handleRestartCommand() {
@@ -122,7 +132,35 @@ class CommandDispatcher
         }
         (new RestartTask(mChannel, false)).run();     // run on the current thread
     }
-    
+
+    private void handleSubscribeCommand() {
+        if (mChannel.isSubscribed()) {
+            mChannel.writeNack("already subscribed");
+            return;
+        }
+        // Register via the atomic acknowledge path: the ACK is queued while holding
+        // the broadcaster monitor only if the subscription is accepted, so a shutdown
+        // race cannot leave the client with "RES OK" followed by EOF and no CLOSING.
+        final EventBroadcaster.SubscribeResult outcome = EventBroadcaster.instance().registerSubscriber(mChannel);
+        switch (outcome) {
+            case Accepted:
+                break;
+            case AlreadyRegistered:
+                // Defensive only: the local isSubscribed check above should catch
+                // duplicate SUBSCRIBE first. No writeNack here because the writer
+                // thread owns the channel and a direct reply would interleave
+                // with queued EVENT lines on mWriteLock.
+                break;
+            case ServerClosing:
+                mChannel.writeNack("server closing");
+                mChannel.close();
+                break;
+            case WriteFailed:
+                mChannel.close();
+                break;
+        }
+    }
+
     private void handlePauseCommand() {
         if (SessionManager.isFIX()) {
             mChannel.writeNack("PAUSE is not valid for the FIX Gateway");

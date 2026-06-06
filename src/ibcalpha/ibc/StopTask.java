@@ -25,15 +25,36 @@ class StopTask
         implements Runnable {
 
     private static final SwitchLock _Running = new SwitchLock();
+    private static PendingClosing _PendingClosing;
+
+    private static final class PendingClosing {
+        final CommandChannel channel;
+        final boolean coldRestart;
+        final String reason;
+        final String closeReason;
+
+        PendingClosing(CommandChannel channel, boolean coldRestart, String reason, String closeReason) {
+            this.channel = channel;
+            this.coldRestart = coldRestart;
+            this.reason = reason;
+            this.closeReason = closeReason;
+        }
+    }
 
     private final CommandChannel mChannel;
     private final boolean mForceColdRestart;
     private final String mReason;
+    private final String mCloseReason;
 
     StopTask(final CommandChannel channel, final boolean forceColdRestart, final String reason) {
+        this(channel, forceColdRestart, reason, forceColdRestart ? "RESTART" : "SHUTDOWN");
+    }
+
+    StopTask(final CommandChannel channel, final boolean forceColdRestart, final String reason, final String closeReason) {
         mChannel = channel;
         mForceColdRestart = forceColdRestart;
         mReason = reason;
+        mCloseReason = closeReason;
     }
 
     @Override
@@ -41,13 +62,15 @@ class StopTask
         if (! _Running.set()) {
             Utils.logToConsole("STOP already in progress");
             writeNack("STOP already in progress");
-            mChannel.close();
+            if (mChannel != null) {
+                mChannel.close();
+            }
             return;
         }
 
         try {
+            setPendingClosing(mChannel, mForceColdRestart, mReason, mCloseReason);
             writeInfo("Closing IBC");
-            if (mForceColdRestart) createColdRestartFlagFile();
             stop(mReason);
         } catch (Exception ex) {
             writeNack(ex.getMessage());
@@ -55,7 +78,38 @@ class StopTask
         }
     }
     
-    private void createColdRestartFlagFile() {
+    private static synchronized void setPendingClosing(CommandChannel channel, boolean forceColdRestart, String reason, String closeReason) {
+        _PendingClosing = new PendingClosing(channel, forceColdRestart, reason, closeReason);
+    }
+
+    private static synchronized void clearPendingClosing() {
+        _PendingClosing = null;
+        _Running.clear();
+    }
+
+    static boolean commitPendingClosing() {
+        final PendingClosing pending;
+        synchronized (StopTask.class) {
+            if (_PendingClosing == null) {
+                return false;
+            }
+            pending = _PendingClosing;
+            _PendingClosing = null;
+        }
+
+        String closeReason = pending.closeReason == null ? "SHUTDOWN" : pending.closeReason;
+        if (pending.coldRestart) {
+            createColdRestartFlagFile();
+        }
+        EventBroadcaster.instance().beginClosing(closeReason);
+        if (pending.channel != null) {
+            pending.channel.writeAck("Shutting down: " + pending.reason);
+            pending.channel.close();
+        }
+        return true;
+    }
+
+    private static void createColdRestartFlagFile() {
         try {
         new File(System.getProperty("jtsConfigDir") + 
                  File.separator + 
@@ -74,19 +128,28 @@ class StopTask
 
     private void stop(String reason) {
         try {
-            writeAck("Shutting down: " + reason);
-            if (mChannel != null) mChannel.close();
             if (LoginManager.loginManager().getLoginState() != LoginManager.LoginState.LOGGED_IN) {
-                CommandServer.commandServer().shutdown();
                 Utils.logToConsole("Login has not completed: exiting immediately");
+                commitPendingClosing();
                 Runtime.getRuntime().halt(0);
             } else {
                 String[] closeMenuPath = SessionManager.isGateway() ? new String[] {"File", "Close"} : new String[] {"File", "Exit"};
                 Utils.logToConsole("Login has completed: exiting via " + Arrays.deepToString(closeMenuPath) + " menu");
-                Utils.invokeMenuItem(MainWindowManager.mainWindowManager().getMainWindow(), closeMenuPath);
+                if (!Utils.invokeMenuItem(MainWindowManager.mainWindowManager().getMainWindow(), closeMenuPath)) {
+                    writeNack("could not invoke " + Arrays.deepToString(closeMenuPath));
+                    if (mChannel != null) {
+                        mChannel.close();
+                    }
+                    clearPendingClosing();
+                }
             }
             
         } catch (Exception e) {
+            writeNack(e.getMessage());
+            if (mChannel != null) {
+                mChannel.close();
+            }
+            clearPendingClosing();
         }
     }
 

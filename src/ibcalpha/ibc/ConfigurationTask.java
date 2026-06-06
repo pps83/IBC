@@ -24,33 +24,56 @@ import javax.swing.JDialog;
 public class ConfigurationTask {
 
     private final ConfigurationAction configAction;
+    private volatile Exception lastException;
 
     public ConfigurationTask(ConfigurationAction configAction) {
         this.configAction = configAction;
+    }
+
+    public String lastErrorMessage() {
+        Throwable t = lastException;
+        String message = "";
+        String fallback = "";
+        while (t != null) {
+            final String current = t.getMessage();
+            if (current != null && !current.isEmpty()) message = current;
+            if (fallback.isEmpty()) fallback = t.getClass().getSimpleName();
+            t = t.getCause();
+        }
+        return message.isEmpty() ? fallback : message;
     }
 
     public void executeAsync() {
         MyCachedThreadPool.getInstance().execute(new ConfigTaskRunner());
     }
 
-    public void execute() {
-        (new ConfigTaskRunner()).run();
+    public boolean execute() {
+        return (new ConfigTaskRunner()).runTask();
     }
 
     private class ConfigTaskRunner implements Runnable {
         @Override
         public void run() {
+            runTask();
+        }
+
+        boolean runTask() {
+            lastException = null;
+            JDialog configDialog = null;
             try {
-                final JDialog configDialog = ConfigDialogManager.configDialogManager().getConfigDialog();    // blocks the thread until the config dialog is available
+                configDialog = ConfigDialogManager.configDialogManager().getConfigDialog();    // blocks the thread until the config dialog is available
                 configAction.initialise(configDialog);
    
                 FutureTask<?> t = new FutureTask<>((Runnable)configAction, null);
                 GuiExecutor.instance().execute(t);
                 t.get();
-
-                ConfigDialogManager.configDialogManager().releaseConfigDialog();
+                return true;
             } catch (Exception e){
+                lastException = e;
                 Utils.logException(e);
+                return false;
+            } finally {
+                if (configDialog != null) ConfigDialogManager.configDialogManager().releaseConfigDialog();
             }
         }
     }

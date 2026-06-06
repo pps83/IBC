@@ -31,7 +31,7 @@ import java.util.List;
 class CommandServer
         implements Runnable {
 
-    private ServerSocket mSocket = null;
+    private volatile ServerSocket mSocket = null;
     private volatile boolean mQuitting = false;
 
     private static CommandServer _commandServer;
@@ -75,10 +75,11 @@ class CommandServer
 
     public void shutdown() {
         mQuitting = true;
-        if (mSocket != null) {
+        final ServerSocket socket = mSocket;
+        if (socket != null) {
             try {
                 Utils.logToConsole("CommandServer closing");
-                mSocket.close();
+                socket.close();
             } catch (IOException ex) {
                 Utils.logException(ex);
             }
@@ -121,9 +122,10 @@ class CommandServer
 
     private Socket getClient() {
         try {
-            if (mSocket.isClosed()) return null;
-            
-            final Socket socket = mSocket.accept();
+            final ServerSocket listener = mSocket;
+            if (listener == null || listener.isClosed()) return null;
+
+            final Socket socket = listener.accept();
 
             final String allowedAddresses = Settings.settings().getString("ControlFrom", "");
             Utils.logToConsole("CommandServer: ControlFrom setting = " + allowedAddresses);
@@ -177,7 +179,9 @@ class CommandServer
     }
     
     private boolean isPermittedClient(final Socket socket, final String allowedAddresses) {
-        if (socket.getInetAddress().getHostAddress().equals(mSocket.getInetAddress().getHostAddress())) return true;
+        final ServerSocket listener = mSocket;
+        if (listener != null
+            && socket.getInetAddress().getHostAddress().equals(listener.getInetAddress().getHostAddress())) return true;
         
         if (socket.getInetAddress().getHostAddress().equals(InetAddress.getLoopbackAddress().getHostAddress())) return true;
 

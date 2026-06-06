@@ -300,6 +300,7 @@ public class IbcTws {
 
     public static void printVersionInfo() {
         Utils.logToConsole("version: " + IbcVersionInfo.IBC_VERSION);
+        Utils.logToConsole("fork: +pps");
     }
 
     private static void createToolkitListener() {

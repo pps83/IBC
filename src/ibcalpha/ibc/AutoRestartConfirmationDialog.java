@@ -20,6 +20,7 @@ package ibcalpha.ibc;
 
 import java.awt.Window;
 import java.awt.event.WindowEvent;
+import javax.swing.JButton;
 import javax.swing.JDialog;
 import javax.swing.JOptionPane;
 
@@ -36,10 +37,15 @@ public class AutoRestartConfirmationDialog implements WindowHandler  {
 
     @Override
     public void handleWindow(Window window, int eventID) {
-        if (SwingUtils.clickButton(window, "OK")) {
-        } else {
+        JButton ok = SwingUtils.findButton(window, "OK");
+        if (ok == null) {
             Utils.logError("could not dismiss AutoRestartConfirmation because we could not find one of the controls.");
+            return;
         }
+        // Arm before clicking OK because some Gateway builds begin shutdown from the button action.
+        EventBroadcaster.instance().emitRestarting();
+        EventBroadcaster.instance().armGatewayAutoRestart(RestartTask.consumeGatewayPauseScheduled() ? "SHUTDOWN" : "RESTART");
+        SwingUtils.clickButton(ok);
     }
 
     @Override

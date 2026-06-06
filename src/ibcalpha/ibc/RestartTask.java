@@ -39,6 +39,20 @@ class RestartTask
         implements Runnable {
 
     private static final SwitchLock _Running = new SwitchLock();
+    private static PendingTerminalClose _PendingTerminalClose;
+    private static boolean _GatewayPauseScheduled;
+
+    private static final class PendingTerminalClose {
+        final CommandChannel channel;
+        final String closeReason;
+        final String ackMessage;
+
+        PendingTerminalClose(CommandChannel channel, String closeReason, String ackMessage) {
+            this.channel = channel;
+            this.closeReason = closeReason;
+            this.ackMessage = ackMessage;
+        }
+    }
 
     private final CommandChannel mChannel;
     
@@ -48,11 +62,9 @@ class RestartTask
 
     RestartTask(final CommandChannel channel,
                 final boolean pauseOnly) {
-        Utils.logToConsole("RestartTask: pauseOnly = " + pauseOnly);
         mChannel = channel;
         mPauseOnly = pauseOnly;
         mVerb = mPauseOnly ? "PAUSE" : "RESTART";
-        Utils.logToConsole("RestartTask: verb = " + mVerb);
     }
 
     @Override
@@ -60,7 +72,9 @@ class RestartTask
         if (! _Running.set()) {
             Utils.logToConsole(mVerb + " already in progress");
             writeNack(mVerb + " already in progress");
-            mChannel.close();
+            if (mChannel != null) {
+                mChannel.close();
+            }
             return;
         }
 
@@ -70,8 +84,8 @@ class RestartTask
                 createPauseFlagFile();
             } else {
                 writeInfo("Restarting TWS");
+                EventBroadcaster.instance().emitRestarting();
             }
-            writeAck(mVerb + " in progress");
             restart(mPauseOnly);
         } catch (Exception ex) {
             writeNack(ex.getMessage());
@@ -90,13 +104,14 @@ class RestartTask
             Utils.exitWithException(ErrorCodes.UNHANDLED_EXCEPTION, e);
         }
     }
-    
+
     void restart(final boolean pauseOnly) {
+        setPendingTerminalClose(mChannel, pauseOnly ? "SHUTDOWN" : "RESTART", mVerb + " in progress");
         if (Utils.invokeMenuItem(MainWindowManager.mainWindowManager().getMainWindow(), new String[] {"File", "Restart..."})) {
-            mChannel.close();
             return;
         }
-        
+        clearPendingTerminalClose(false);
+
         while (LocalTime.now().getSecond() >= 58) {
             try {sleep(1);} catch (InterruptedException e) {}
         }
@@ -115,14 +130,28 @@ class RestartTask
         LocalTime actionTime = now.withHour(newHour).withMinute(newMinute).withSecond(0);
 
         Utils.logToConsole("Setting auto-restart time to " + actionTime.format(DateTimeFormatter.ofPattern("hh:mm a")));
-        (new ConfigurationTask(new ConfigureAutoLogoffOrRestartTimeTask(
-                                        "Auto restart", 
+        ConfigurationTask task = new ConfigurationTask(new ConfigureAutoLogoffOrRestartTimeTask(
+                                        "Auto restart",
                                         actionTime)
-                                )
-        ).executeAsync();
+                                );
+        boolean configured = task.execute();
+        if (!configured) {
+            String why = task.lastErrorMessage();
+            writeNack("could not set auto-restart time" + (why.isEmpty() ? "" : ": " + why));
+            if (mChannel != null) {
+                mChannel.close();
+            }
+            clearPendingTerminalClose(true);
+            return;
+        }
 
+        setGatewayPauseScheduled(pauseOnly);
         writeAck(mVerb + " at "  + actionTime.format(DateTimeFormatter.ofPattern("hh:mm a")));
-        mChannel.close();
+        if (mChannel != null) {
+            mChannel.close();
+        }
+        // Keep _Running set until the scheduled shutdown fires; another
+        // RESTART/PAUSE before then would race the same Gateway setting.
 
         try {
             if (!GraphicsEnvironment.getLocalGraphicsEnvironment().getDefaultScreenDevice().isWindowTranslucencySupported(TRANSLUCENT)) return;
@@ -138,7 +167,46 @@ class RestartTask
                                             : actionTime.atDate(LocalDate.now()));
         window.setGlassPane(countdown);
         countdown.setVisible(true);
-    }    
+    }
+
+    private static synchronized void setPendingTerminalClose(CommandChannel channel, String closeReason, String ackMessage) {
+        _PendingTerminalClose = new PendingTerminalClose(channel, closeReason, ackMessage);
+    }
+
+    private static synchronized void clearPendingTerminalClose(boolean releaseRunning) {
+        _PendingTerminalClose = null;
+        if (releaseRunning) {
+            _Running.clear();
+        }
+    }
+
+    static boolean commitPendingTerminalClose() {
+        final PendingTerminalClose pending;
+        synchronized (RestartTask.class) {
+            if (_PendingTerminalClose == null) {
+                return false;
+            }
+            pending = _PendingTerminalClose;
+            _PendingTerminalClose = null;
+        }
+
+        EventBroadcaster.instance().beginClosing(pending.closeReason);
+        if (pending.channel != null) {
+            pending.channel.writeAck(pending.ackMessage);
+            pending.channel.close();
+        }
+        return true;
+    }
+
+    private static synchronized void setGatewayPauseScheduled(boolean scheduled) {
+        _GatewayPauseScheduled = scheduled;
+    }
+
+    static synchronized boolean consumeGatewayPauseScheduled() {
+        boolean result = _GatewayPauseScheduled;
+        _GatewayPauseScheduled = false;
+        return result;
+    }
 
     private void writeAck(String message) {if (mChannel != null) mChannel.writeAck(message);}
     private void writeInfo(String message) {if (mChannel != null) mChannel.writeInfo(message);}
