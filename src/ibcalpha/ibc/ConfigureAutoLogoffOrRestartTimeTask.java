@@ -108,8 +108,8 @@ class ConfigureAutoLogoffOrRestartTimeTask implements ConfigurationAction {
             }
             
         } catch (IbcException e) {
-            Utils.logError(e.getMessage());
+            throw new IllegalStateException(e.getMessage(), e);
         }
     }
-    
+
 }

@@ -55,6 +55,7 @@ public class GatewayDialogHandler implements WindowHandler {
                 body = area.getText();
             }
             Utils.logToConsole(body);
+            EventBroadcaster.instance().emitConnectionFailed();
             Utils.logToConsole("Cold restart in progress");
             // stop tidily and do a cold restart
             MyCachedThreadPool.getInstance().execute(new StopTask(null, true, "Cold restart after " + CONN_FAIL));

@@ -32,6 +32,10 @@ public abstract class AbstractLoginHandler implements WindowHandler {
         switch (eventId) {
             case WindowEvent.WINDOW_OPENED:
                 Utils.logToConsole("Login dialog WINDOW_OPENED: LoginState is " + LoginManager.loginManager().getLoginState().toString());
+                // LOGGED_OUT observation point: a mid-session re-auth opens the login window with LoginState
+                // still LOGGED_IN, so emit before the state filter below; the broadcaster's READY gate
+                // suppresses the normal-startup opens.
+                EventBroadcaster.instance().emitLoggedOut();
                 switch (LoginManager.loginManager().getLoginState()) {
                     case LOGGED_IN:
                         return false;

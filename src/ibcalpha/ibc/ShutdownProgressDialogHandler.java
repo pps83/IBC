@@ -33,9 +33,14 @@ public class ShutdownProgressDialogHandler implements WindowHandler {
     }
 
     public void handleWindow(Window window, int eventID) {
+        // This is the last generic shutdown point before JVM exit; command paths
+        // commit their pending reason first, otherwise classify the user/Gateway shutdown.
+        if (!StopTask.commitPendingClosing() && !RestartTask.commitPendingTerminalClose()) {
+            final EventBroadcaster broadcaster = EventBroadcaster.instance();
+            broadcaster.beginClosing(broadcaster.gatewayAutoRestartCloseReason());
+        }
         MyCachedThreadPool.getInstance().shutdownNow();
         MyScheduledExecutorService.getInstance().shutdownNow();
-        CommandServer.commandServer().shutdown();
     }
 
     public boolean recogniseWindow(Window window) {

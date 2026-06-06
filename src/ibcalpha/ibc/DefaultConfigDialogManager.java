@@ -193,6 +193,7 @@ public class DefaultConfigDialogManager extends ConfigDialogManager {
         if (usageCount == 0){
             GuiDeferredExecutor.instance().execute(() -> {
                 Utils.logToConsole("Configuration tasks completed");
+                EventBroadcaster.instance().emitReady();
                 SwingUtils.clickButton(configDialog, "OK");
                 GuiDeferredExecutor.instance().execute(() -> MainWindowManager.mainWindowManager().iconizeIfRequired());
             });
