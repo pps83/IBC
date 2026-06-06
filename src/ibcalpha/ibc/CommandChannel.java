@@ -35,6 +35,11 @@ final class CommandChannel {
     private BufferedReader mInstream = null;
     private BufferedWriter mOutstream = null;
 
+    // Set by getCommand() when the incoming line used the "REQ <id> <command>" form,
+    // so that writeAck/writeNack can wrap the reply as "RES <id> ...". Cleared when
+    // the next line is read in plain form, or at EOF.
+    private volatile String mCurrentRequestId = null;
+
     CommandChannel(Socket socket) {
 
         mSocket = socket;
@@ -89,19 +94,63 @@ final class CommandChannel {
             Utils.logException(e);
             close();
         }
-        return cmd;
+        if (cmd == null) {
+            mCurrentRequestId = null;
+            return null;
+        }
+        return extractCommand(cmd);
+    }
+
+    // Detect the "REQ <id> <command>" form. If present, store the id for reply
+    // correlation and return just the command portion. Plain form leaves the id
+    // null and returns the line unchanged.
+    private String extractCommand(String line) {
+        final String trimmed = line.trim();
+        final int reqEnd = tokenEnd(trimmed, 0);
+        if (!trimmed.regionMatches(true, 0, "REQ", 0, 3) || reqEnd != 3)
+            return plainCommand(line);
+        final int idStart = skipWhitespace(trimmed, reqEnd);
+        if (idStart >= trimmed.length())
+            return plainCommand(line);
+        final int idEnd = tokenEnd(trimmed, idStart);
+        final int cmdStart = skipWhitespace(trimmed, idEnd);
+        if (cmdStart >= trimmed.length())
+            return plainCommand(line);
+        mCurrentRequestId = trimmed.substring(idStart, idEnd);
+        return trimmed.substring(cmdStart);
+    }
+
+    private static int skipWhitespace(String s, int i) {
+        while (i < s.length() && Character.isWhitespace(s.charAt(i))) i++;
+        return i;
+    }
+
+    private static int tokenEnd(String s, int i) {
+        while (i < s.length() && !Character.isWhitespace(s.charAt(i))) i++;
+        return i;
+    }
+
+    private String plainCommand(String line) {
+        mCurrentRequestId = null;
+        return line;
     }
 
     void writeAck(String info) {
-        replyLine("OK " + info);
+        replyLine(replyPrefix() + "OK " + info);
     }
 
+    // INFO lines are unsolicited progress chatter and are not wrapped in RES,
+    // so the request id prefix is intentionally not applied here.
     final void writeInfo(String info) {
         if (! _SuppressInfo) replyLine("INFO " + info);
     }
 
     void writeNack(String info) {
-        replyLine("ERROR " + info);
+        replyLine(replyPrefix() + "ERROR " + info);
+    }
+
+    private String replyPrefix() {
+        return mCurrentRequestId == null ? "" : ("RES " + mCurrentRequestId + " ");
     }
 
     void writePrompt() {
