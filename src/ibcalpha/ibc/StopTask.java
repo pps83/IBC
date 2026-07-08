@@ -32,12 +32,14 @@ class StopTask
         final boolean coldRestart;
         final String reason;
         final String closeReason;
+        final String requestId; // captured at command time; the channel's live id may be a later command's
 
-        PendingClosing(CommandChannel channel, boolean coldRestart, String reason, String closeReason) {
+        PendingClosing(CommandChannel channel, boolean coldRestart, String reason, String closeReason, String requestId) {
             this.channel = channel;
             this.coldRestart = coldRestart;
             this.reason = reason;
             this.closeReason = closeReason;
+            this.requestId = requestId;
         }
     }
 
@@ -79,7 +81,8 @@ class StopTask
     }
     
     private static synchronized void setPendingClosing(CommandChannel channel, boolean forceColdRestart, String reason, String closeReason) {
-        _PendingClosing = new PendingClosing(channel, forceColdRestart, reason, closeReason);
+        _PendingClosing = new PendingClosing(channel, forceColdRestart, reason, closeReason,
+                channel == null ? null : channel.currentRequestId());
     }
 
     private static synchronized void clearPendingClosing() {
@@ -103,7 +106,7 @@ class StopTask
         }
         EventBroadcaster.instance().beginClosing(closeReason);
         if (pending.channel != null) {
-            pending.channel.writeAck("Shutting down: " + pending.reason);
+            pending.channel.writeAck(pending.requestId, "Shutting down: " + pending.reason);
             pending.channel.close();
         }
         return true;

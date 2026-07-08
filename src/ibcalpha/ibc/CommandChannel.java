@@ -324,6 +324,16 @@ final class CommandChannel {
         replyLine(replyPrefix() + "OK " + info);
     }
 
+    // Deferred-ack form: the caller captured the request id when the command was read, so a later
+    // pipelined command cannot re-label the reply.
+    void writeAck(String requestId, String info) {
+        replyLine(prefixFor(requestId) + "OK " + info);
+    }
+
+    String currentRequestId() {
+        return mCurrentRequestId;
+    }
+
     // INFO lines are unsolicited progress chatter and are not wrapped in RES,
     // so the request id prefix is intentionally not applied here.
     final void writeInfo(String info) {
@@ -335,7 +345,11 @@ final class CommandChannel {
     }
 
     private String replyPrefix() {
-        return mCurrentRequestId == null ? "" : ("RES " + mCurrentRequestId + " ");
+        return prefixFor(mCurrentRequestId);
+    }
+
+    private static String prefixFor(String requestId) {
+        return requestId == null ? "" : ("RES " + requestId + " ");
     }
 
     void writePrompt() {
