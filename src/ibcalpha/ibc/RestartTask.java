@@ -46,11 +46,13 @@ class RestartTask
         final CommandChannel channel;
         final String closeReason;
         final String ackMessage;
+        final String requestId; // captured at command time; the channel's live id may be a later command's
 
-        PendingTerminalClose(CommandChannel channel, String closeReason, String ackMessage) {
+        PendingTerminalClose(CommandChannel channel, String closeReason, String ackMessage, String requestId) {
             this.channel = channel;
             this.closeReason = closeReason;
             this.ackMessage = ackMessage;
+            this.requestId = requestId;
         }
     }
 
@@ -170,7 +172,8 @@ class RestartTask
     }
 
     private static synchronized void setPendingTerminalClose(CommandChannel channel, String closeReason, String ackMessage) {
-        _PendingTerminalClose = new PendingTerminalClose(channel, closeReason, ackMessage);
+        _PendingTerminalClose = new PendingTerminalClose(channel, closeReason, ackMessage,
+                channel == null ? null : channel.currentRequestId());
     }
 
     private static synchronized void clearPendingTerminalClose(boolean releaseRunning) {
@@ -192,7 +195,7 @@ class RestartTask
 
         EventBroadcaster.instance().beginClosing(pending.closeReason);
         if (pending.channel != null) {
-            pending.channel.writeAck(pending.ackMessage);
+            pending.channel.writeAck(pending.requestId, pending.ackMessage);
             pending.channel.close();
         }
         return true;
