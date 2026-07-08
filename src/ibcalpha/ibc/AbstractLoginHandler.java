@@ -32,6 +32,10 @@ public abstract class AbstractLoginHandler implements WindowHandler {
         switch (eventId) {
             case WindowEvent.WINDOW_OPENED:
                 Utils.logToConsole("Login dialog WINDOW_OPENED: LoginState is " + LoginManager.loginManager().getLoginState().toString());
+                // LOGGED_OUT observation point: a mid-session re-auth opens the login window with LoginState
+                // still LOGGED_IN, so emit before the state filter below; the broadcaster's READY gate
+                // suppresses the normal-startup opens.
+                EventBroadcaster.instance().emitLoggedOut();
                 switch (LoginManager.loginManager().getLoginState()) {
                     case LOGGED_IN:
                         return false;
@@ -53,11 +57,6 @@ public abstract class AbstractLoginHandler implements WindowHandler {
     public final void handleWindow(Window window, int eventID) {
         if (LoginManager.loginManager().getLoginHandler() == null) LoginManager.loginManager().setLoginHandler(this);
         LoginManager.loginManager().setLoginFrame((JFrame) window);
-        // Real LOGGED_OUT observation point: the login frame opened. The broadcaster
-        // gates this on having previously seen READY so initial-boot dialogs do not
-        // poison the snapshot; the only emissions that actually fire here are real
-        // mid-session re-auth events.
-        EventBroadcaster.instance().emitLoggedOut();
         switch (LoginManager.loginManager().getLoginState()){
             case LOGGED_OUT:
                 if (! SessionManager.isRestart()) {
