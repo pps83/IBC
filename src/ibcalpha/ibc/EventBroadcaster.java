@@ -53,6 +53,7 @@ final class EventBroadcaster {
     // Set by beginClosing. Once true, registerSubscriber refuses new connections and
     // emit* calls become no-ops; the terminal EVENT CLOSING line has already been sent.
     private volatile boolean mClosing;
+    private boolean mReadyEmitted; // guarded by the broadcaster monitor
     private volatile long mLastLoggedOutMs;
     // Set on autorestart confirmation; the JVM shutdown hook reads this to decide which CLOSING reason to emit.
     private volatile boolean mGatewayAutoRestartArmed = false;
@@ -68,7 +69,12 @@ final class EventBroadcaster {
     }
 
     // Steady-state transitions: update snapshot AND broadcast EVENT.
+    // READY is once per JVM session: the config-completed point re-fires whenever the config dialog
+    // usage count drops to zero again, and a repeat would falsely release a planned-restart wait.
     synchronized void emitReady() {
+        if (mReadyEmitted)
+            return;
+        mReadyEmitted = true;
         transitionState("READY");
     }
 
