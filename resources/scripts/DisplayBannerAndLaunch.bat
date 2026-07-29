@@ -156,8 +156,8 @@ echo +
 echo + Press any key to close this window
 pause > NUL
 echo +
-if "%INLINE%" == "1" exit /B
-exit
+if "%INLINE%" == "1" exit /B %ERRORCODE%
+exit %ERRORCODE%
 
 :SetScreenColors
 :: set the screen background and text colors
