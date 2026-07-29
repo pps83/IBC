@@ -415,6 +415,12 @@ if not defined JAVA_PATH (
 	)
 )
 
+:: The jre bundled with the TWS/Gateway version itself; the .cfg files can point at a JRE that is no
+:: longer there (eg the 1048 installer recorded its own temp extraction folder)
+if not defined JAVA_PATH (
+	if exist "%INSTALL4J%\..\jre\bin\java.exe" set JAVA_PATH=%INSTALL4J%\..\jre\bin
+)
+
 if not defined JAVA_PATH (
 	if exist "%PROGRAMDATA%\Oracle\Java\javapath\java.exe" set JAVA_PATH="%PROGRAMDATA%\Oracle\Java\javapath"
 )
