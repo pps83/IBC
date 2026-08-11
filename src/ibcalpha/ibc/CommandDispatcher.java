@@ -61,6 +61,8 @@ class CommandDispatcher
                 if (mChannel.isSubscribed()) {
                     return;
                 }
+            } else if (cmd.equalsIgnoreCase("IDENTIFY")) {
+                handleIdentifyCommand();
             } else if (cmd.equalsIgnoreCase("PAUSE")) {
             	handlePauseCommand();
             } else {
@@ -70,6 +72,10 @@ class CommandDispatcher
             cmd = mChannel.getCommand();
         }
         mChannel.close();
+    }
+
+    private void handleIdentifyCommand() {
+        mChannel.writeAck(EventBroadcaster.instance().identity());
     }
 
     private void handleInvalidCommand(String cmd) {
