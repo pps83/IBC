@@ -18,8 +18,10 @@
 
 package ibcalpha.ibc;
 
+import java.lang.management.ManagementFactory;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -45,6 +47,10 @@ final class EventBroadcaster {
         t.setDaemon(true);
         return t;
     });
+
+    // Minted once per JVM so an adopting client can tell this gateway apart from a successor that
+    // reuses the same port; never reused across an in-process autorestart, which forks a new JVM.
+    private static final String INSTANCE_ID = UUID.randomUUID().toString();
 
     private final CopyOnWriteArrayList<CommandChannel> mSubscribers = new CopyOnWriteArrayList<>();
     // null = no STATE replay yet. Updated only by transitionState (READY / LOGGED_OUT),
@@ -217,6 +223,20 @@ final class EventBroadcaster {
             return SubscribeResult.WriteFailed;
         }
         return SubscribeResult.Accepted;
+    }
+
+    // Identity reply body for IDENTIFY, as key=value tokens on the OK line. state is the same snapshot a
+    // SUBSCRIBE would replay, so an adopting client reads one consistent view without subscribing.
+    String identity() {
+        final String state = mSnapshotState;
+        return "id=" + INSTANCE_ID + " pid=" + currentPid() + " state=" + (state == null ? "UNKNOWN" : state);
+    }
+
+    private static String currentPid() {
+        // RuntimeMXBean name is "pid@host" on every JVM IBC supports; ProcessHandle would need Java 9.
+        final String name = ManagementFactory.getRuntimeMXBean().getName();
+        final int at = name.indexOf('@');
+        return at > 0 ? name.substring(0, at) : "0";
     }
 
     void removeSubscriber(CommandChannel channel) {
