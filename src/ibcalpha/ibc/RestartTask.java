@@ -96,6 +96,9 @@ class RestartTask
     }
     
     private void createPauseFlagFile() {
+        if (NativeLaunch.isNativeMode()) {
+            return;
+        }
         try {
         new File(System.getProperty("jtsConfigDir") + 
                  File.separator + 

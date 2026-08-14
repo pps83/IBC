@@ -37,6 +37,10 @@ public class LoginFailedDialogHandler implements WindowHandler  {
 
     @Override
     public void handleWindow(Window window, int eventID) {
+        if (NativeLaunch.isNativeMode()) {
+            NativeLaunch.reportAuthenticationRejected();
+            return;
+        }
         Utils.logToConsole("Login failed");
         Utils.logToConsole("Cold restart in progress");
         // stop tidily and do a cold restart

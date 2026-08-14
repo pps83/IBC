@@ -113,6 +113,9 @@ class StopTask
     }
 
     private static void createColdRestartFlagFile() {
+        if (NativeLaunch.isNativeMode()) {
+            return;
+        }
         try {
         new File(System.getProperty("jtsConfigDir") + 
                  File.separator + 
