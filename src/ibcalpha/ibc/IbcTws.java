@@ -221,7 +221,11 @@ public class IbcTws {
     static void setupDefaultEnvironment(final String[] args, final boolean isGateway) throws Exception {
         SessionManager.initialise(isGateway);
         Settings.initialise(new DefaultSettings(args));
-        LoginManager.initialise(new DefaultLoginManager(args));
+        if (NativeLaunch.isNativeMode()) {
+            LoginManager.initialise(new DefaultLoginManager(NativeLaunch.userId(), NativeLaunch.password()));
+        } else {
+            LoginManager.initialise(new DefaultLoginManager(args));
+        }
         MainWindowManager.initialise(new DefaultMainWindowManager());
         TradingModeManager.initialise(new DefaultTradingModeManager(args));
     }
