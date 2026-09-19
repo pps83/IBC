@@ -55,6 +55,9 @@ public class SecondFactorAuthenticationDialogHandler implements WindowHandler {
                 selectSecondFactorDevice(window);
             } else {
                 LoginManager.loginManager().setLoginState(LoginManager.LoginState.TWO_FA_IN_PROGRESS);
+                if (NativeLaunch.isNativeMode()) {
+                    NativeLaunch.reportSecondFactorPending();
+                }
             }
         } else if (eventID == WindowEvent.WINDOW_CLOSED) {
             if (LoginManager.loginManager().readonlyLoginRequired()) {

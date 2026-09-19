@@ -41,6 +41,8 @@ final class NativeLaunch {
     static final String REASON_UNAVAILABLE = "UNAVAILABLE";
     static final String REASON_OTHER_SESSION = "OTHER_SESSION";
     private static final String REASON_LOCKOUT = "LOCKOUT";
+    /** The second-factor dialog is up: the login now waits on a person, and so may the launcher. */
+    private static final String SECOND_FACTOR_PENDING = "IBC_NATIVE_EVENT SECOND_FACTOR_PENDING";
 
     private NativeLaunch() { }
 
@@ -73,6 +75,10 @@ final class NativeLaunch {
     /** The lockout reason carries the seconds IBKR asked for, as the handler parsed them. */
     static String lockoutReason(long seconds) {
         return REASON_LOCKOUT + " " + seconds;
+    }
+
+    static void reportSecondFactorPending() {
+        Utils.logRawToConsole(SECOND_FACTOR_PENDING);
     }
 
 }
