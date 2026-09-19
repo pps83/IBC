@@ -46,10 +46,6 @@ public class TooManyFailedLoginAttemptsDialogHandler implements WindowHandler {
         //
             String message = SwingUtils.findTextArea(window, "Too many failed login attempts").getText();
             Utils.logToConsole(message);
-            if (NativeLaunch.isNativeMode()) {
-                NativeLaunch.reportLoginRefused(message);
-                return;
-            }
             Pattern p = Pattern.compile("(?:Too many failed login attempts. Please wait (?:(\\d\\d?) minute(?:s)? )?(?:& )?(?:(\\d\\d?) second(?:s)?)?)?");
             Matcher m = p.matcher(message);
             String minutes = "";
@@ -61,6 +57,10 @@ public class TooManyFailedLoginAttemptsDialogHandler implements WindowHandler {
                 if (seconds == null || seconds.isEmpty()) seconds = "0";
             }
             Duration waitfor = Duration.parse("PT" + minutes + "M" + seconds + "S").plus(Duration.ofSeconds(3));
+            if (NativeLaunch.isNativeMode()) {
+                NativeLaunch.reportLoginRefused(NativeLaunch.lockoutReason(waitfor.getSeconds()), message);
+                return;
+            }
 
             if (Settings.settings().getBoolean("ReloginAfterSecondFactorAuthenticationTimeout", false)) {
                 Utils.logToConsole("Will re-login at " + Utils.formatDate(LocalDateTime.now().plus(waitfor)) + 

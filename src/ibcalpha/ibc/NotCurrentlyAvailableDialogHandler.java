@@ -36,6 +36,10 @@ class NotCurrentlyAvailableDialogHandler implements WindowHandler {
     }
 
     public void handleWindow(Window window, int eventID) {
+        if (NativeLaunch.isNativeMode()) {
+            NativeLaunch.reportLoginRefused(NativeLaunch.REASON_UNAVAILABLE, "The system is not currently available.");
+            return;
+        }
         if (! SwingUtils.clickButton(window, "OK")) {
             Utils.logError("The system is not currently available.");
             return;

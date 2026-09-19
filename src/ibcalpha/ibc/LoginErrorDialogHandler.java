@@ -39,7 +39,7 @@ public class LoginErrorDialogHandler implements WindowHandler {
         String texts = SwingUtils.getTexts(window);
         Utils.logToConsole("Login error message:" + SwingUtils.NEWLINE + texts);
         if (NativeLaunch.isNativeMode()) {
-            NativeLaunch.reportLoginRefused(texts);
+            NativeLaunch.reportLoginRefused(NativeLaunch.REASON_BAD_CREDENTIALS, texts);
             return;
         }
         Utils.logToConsole("Cold restart in progress");
