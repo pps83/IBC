@@ -36,7 +36,12 @@ public class LoginErrorDialogHandler implements WindowHandler {
 
     @Override
     public void handleWindow(Window window, int eventID) {
-        Utils.logToConsole("Login error message:" + SwingUtils.NEWLINE + SwingUtils.getTexts(window));
+        String texts = SwingUtils.getTexts(window);
+        Utils.logToConsole("Login error message:" + SwingUtils.NEWLINE + texts);
+        if (NativeLaunch.isNativeMode()) {
+            NativeLaunch.reportLoginRefused(texts);
+            return;
+        }
         Utils.logToConsole("Cold restart in progress");
         // stop tidily and do a cold restart
         MyCachedThreadPool.getInstance().execute(new StopTask(null, true, "Cold restart after Login Error dialog encountered"));

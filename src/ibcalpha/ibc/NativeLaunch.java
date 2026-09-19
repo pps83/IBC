@@ -34,6 +34,8 @@ final class NativeLaunch {
 
     /** Parsed by the launcher out of stdout, so this is protocol text and not a log message. */
     private static final String AUTHENTICATION_REJECTED = "IBC_NATIVE_EVENT AUTHENTICATION_REJECTED";
+    /** Followed by the gateway's own words for the refusal, on that one line. */
+    private static final String LOGIN_REFUSED_PREFIX = "IBC_NATIVE_EVENT LOGIN_REFUSED ";
 
     private NativeLaunch() { }
 
@@ -52,6 +54,15 @@ final class NativeLaunch {
     /** Reports that IBKR definitively rejected the credentials. Terminating is the launcher's decision. */
     static void reportAuthenticationRejected() {
         Utils.logRawToConsole(AUTHENTICATION_REJECTED);
+    }
+
+    /**
+     * Reports a login-phase dialog in which the gateway refused to proceed, quoting its text on one line.
+     * Terminating is the launcher's decision; the dialog stays open for an operator to read.
+     */
+    static void reportLoginRefused(String dialogText) {
+        String oneLine = dialogText == null ? "" : dialogText.replaceAll("<[^>]*>", " ").replaceAll("\\s+", " ").trim();
+        Utils.logRawToConsole(LOGIN_REFUSED_PREFIX + oneLine);
     }
 
 }

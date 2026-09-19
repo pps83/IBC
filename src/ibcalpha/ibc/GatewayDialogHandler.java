@@ -55,6 +55,10 @@ public class GatewayDialogHandler implements WindowHandler {
                 body = area.getText();
             }
             Utils.logToConsole(body);
+            if (NativeLaunch.isNativeMode()) {
+                NativeLaunch.reportLoginRefused(body);
+                return;
+            }
             EventBroadcaster.instance().emitConnectionFailed();
             Utils.logToConsole("Cold restart in progress");
             // stop tidily and do a cold restart

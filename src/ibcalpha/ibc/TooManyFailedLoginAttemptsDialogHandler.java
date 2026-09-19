@@ -46,6 +46,10 @@ public class TooManyFailedLoginAttemptsDialogHandler implements WindowHandler {
         //
             String message = SwingUtils.findTextArea(window, "Too many failed login attempts").getText();
             Utils.logToConsole(message);
+            if (NativeLaunch.isNativeMode()) {
+                NativeLaunch.reportLoginRefused(message);
+                return;
+            }
             Pattern p = Pattern.compile("(?:Too many failed login attempts. Please wait (?:(\\d\\d?) minute(?:s)? )?(?:& )?(?:(\\d\\d?) second(?:s)?)?)?");
             Matcher m = p.matcher(message);
             String minutes = "";
