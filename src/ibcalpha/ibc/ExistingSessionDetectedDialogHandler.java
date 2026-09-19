@@ -110,6 +110,11 @@ public class ExistingSessionDetectedDialogHandler implements WindowHandler {
                 }
             } else {
                 Utils.logToConsole("Other session must be primary or primary override, so end this session and let the other one proceed (scenario 4)");
+                if (NativeLaunch.isNativeMode()) {
+                    NativeLaunch.reportLoginRefused(NativeLaunch.REASON_OTHER_SESSION,
+                                                    "Existing session detected; the other session is primary");
+                    return;
+                }
                 if (!SwingUtils.clickButton(window, "Cancel") && !SwingUtils.clickButton(window, "Exit Application")) {
                     Utils.logError("could not handle 'Existing session detected' dialog because the 'Cancel' or 'Exit Application' button wasn't found.");
                 }

@@ -27,6 +27,7 @@ import javax.swing.JTextPane;
 public class GatewayDialogHandler implements WindowHandler {
 
     private static final String CONN_FAIL = "Connection to server failed";
+    private static final String WRONG_MODE_TEXT = "Trading Mode";
 
     @Override
     public boolean filterEvent(Window window, int eventId) {
@@ -55,6 +56,13 @@ public class GatewayDialogHandler implements WindowHandler {
                 body = area.getText();
             }
             Utils.logToConsole(body);
+            if (NativeLaunch.isNativeMode()) {
+                // The one refusal in this dialog that no retry can fix names the mode toggle; the rest is IBKR's side.
+                String reason = body.contains(WRONG_MODE_TEXT) ? NativeLaunch.REASON_WRONG_MODE
+                                                               : NativeLaunch.REASON_UNAVAILABLE;
+                NativeLaunch.reportLoginRefused(reason, body);
+                return;
+            }
             EventBroadcaster.instance().emitConnectionFailed();
             Utils.logToConsole("Cold restart in progress");
             // stop tidily and do a cold restart
