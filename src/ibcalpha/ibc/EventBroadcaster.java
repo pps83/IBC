@@ -229,7 +229,8 @@ final class EventBroadcaster {
     // SUBSCRIBE would replay, so an adopting client reads one consistent view without subscribing.
     String identity() {
         final String state = mSnapshotState;
-        return "id=" + INSTANCE_ID + " pid=" + currentPid() + " state=" + (state == null ? "UNKNOWN" : state);
+        return "id=" + INSTANCE_ID + " pid=" + currentPid() + " state=" + (state == null ? "UNKNOWN" : state)
+                + " version=" + IbcVersionInfo.IBC_FORK_VERSION;
     }
 
     private static String currentPid() {
